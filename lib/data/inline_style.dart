@@ -17,10 +17,30 @@ class InlineStyle {
       var key = field[0];
       switch (key.toUpperCase()) {
         case "COLOR":
-          oStyle = oStyle.copyWith(color: Color(int.parse("FF$value", radix: 16)));
+          if (!value.contains("rgb")) {
+            oStyle = oStyle.copyWith(
+              color: Color(int.parse("FF$value", radix: 16)),
+            );
+          } else if (value.contains("rgb(")) {
+            String cleanColorString =
+            value.replaceAll('rgb(', '').replaceAll(')', '');
+
+            List<String> colorValues = cleanColorString.split(',');
+
+            int r = int.parse(colorValues[0].trim());
+            int g = int.parse(colorValues[1].trim());
+            int b = int.parse(colorValues[2].trim());
+            oStyle = oStyle.copyWith(color: Color.fromRGBO(r, g, b, 1.0));
+          }
           break;
         case "FONTSIZE":
-          oStyle = oStyle.copyWith(fontSize: double.parse(value));
+          oStyle = oStyle.copyWith(
+            fontSize: (
+                double.tryParse(
+                    value.replaceAll(RegExp(r'[^0-9]'), '')
+                ) ?? 14
+            ) - 2,
+          );
           break;
         case "LETTERSPACING":
           oStyle = oStyle.copyWith(letterSpacing: double.parse(value));
@@ -46,6 +66,13 @@ class InlineStyle {
       }
     }
     return oStyle;
+  }
+
+  double parseSize(String value){
+    if(value.endsWith("pt")){
+      return double.parse(value.substring(0, value.length - 2));
+    }
+    return double.parse(value);
   }
 
   @override
@@ -123,10 +150,16 @@ class Entity {
       : type = json['type'],
         data = EntityData.fromJson(json['data']),
         mutability = json['mutability'];
+
+  @override
+  String toString() {
+    return 'Entity(type: $type, data: $data, mutability: $mutability)';
+  }
 }
 
 class EntityData {
   final String? url;
+  final String? src;
   final String? name;
   final String? href;
   final String? type;
@@ -134,8 +167,14 @@ class EntityData {
 
   EntityData.fromJson(dynamic json)
       : url = json['url'],
+        src = json['src'],
         name = json['name'],
         href = json['href'],
         type = json['type'],
         target = json['target'];
+
+  @override
+  String toString() {
+    return 'EntityData(url: $url, src: $src, name: $name, href: $href, type: $type, target: $target)';
+  }
 }

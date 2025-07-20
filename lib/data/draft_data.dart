@@ -9,6 +9,14 @@ class DraftData {
   int maxDepth = 0;
 
   DraftData.fromJson(dynamic json) {
+    if (json is String && json.trim().isEmpty) {
+      return;
+    } else if (json is String) {
+      blocks.add(Block(
+          text: json
+      ));
+      return;
+    }
     if (json['blocks'] != null) {
       json['blocks'].forEach((v) {
         var block = Block.fromJson(v);
@@ -52,20 +60,26 @@ class DraftData {
 }
 
 class Block {
-  /// key
   String? _key;
 
-  /// 文本
   String? _text;
 
-  /// 类型
   String? _type;
 
-  /// 深度
   int? _depth;
   List<InlineStyle>? _inlineStyleRanges;
   List<EntityRange>? _entityRanges;
   Data? _data;
+
+  Block({
+    String? key,
+    String? text,
+    String? type,
+    int? depth,
+    List<InlineStyle>? inlineStyleRanges,
+    List<EntityRange>? entityRanges,
+    Data? data,
+  }) : _data = data, _entityRanges = entityRanges, _inlineStyleRanges = inlineStyleRanges, _depth = depth, _type = type, _text = text, _key = key;
 
   Block.fromJson(dynamic json) {
     _key = json['key'];
