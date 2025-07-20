@@ -16,53 +16,55 @@ class DraftTextView extends StatelessWidget {
   final TextStyle? indexStyle;
   final DraftData data;
   final TextStyle defaultStyle;
+  final TextStyle? equationStyle;
   final OnLinkTab? onLinkTab;
   final double blockSpacing;
   final ScrollController? controller;
   final EdgeInsets? padding;
-  final String? chapter;
 
-  DraftTextView.json(dynamic json,
-      {Key? key,
-        this.indexNumber,
-        this.indexDelimiter = ". ",
-        this.indexStyle,
-        this.onLinkTab,
-        this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
-        this.controller,
-        this.padding,
-        this.blockSpacing = 8,
-        this.chapter})
-      : data = DraftData.fromJson(json),
+  DraftTextView.json(
+    dynamic json, {
+    Key? key,
+    this.indexNumber,
+    this.indexDelimiter = ". ",
+    this.indexStyle,
+    this.onLinkTab,
+    this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
+    this.equationStyle,
+    this.controller,
+    this.padding,
+    this.blockSpacing = 8,
+  })  : data = DraftData.fromJson(json),
         super(key: key);
 
-  DraftTextView.jsonString(String json,
-      {Key? key,
-        this.indexNumber,
-        this.indexDelimiter = ". ",
-        this.indexStyle,
-        this.onLinkTab,
-        this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
-        this.controller,
-        this.padding,
-        this.blockSpacing = 8,
-        this.chapter})
-      : data = DraftData.fromJson(jsonDecode(json)),
+  DraftTextView.jsonString(
+    String json, {
+    Key? key,
+    this.indexNumber,
+    this.indexDelimiter = ". ",
+    this.indexStyle,
+    this.onLinkTab,
+    this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
+    this.equationStyle,
+    this.controller,
+    this.padding,
+    this.blockSpacing = 8,
+  })  : data = DraftData.fromJson(jsonDecode(json)),
         super(key: key);
 
-  const DraftTextView(
-      {Key? key,
-        required this.data,
-        this.indexNumber,
-        this.indexDelimiter = ". ",
-        this.indexStyle,
-        this.onLinkTab,
-        this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
-        this.controller,
-        this.padding,
-        this.blockSpacing = 8,
-        this.chapter})
-      : super(key: key);
+  const DraftTextView({
+    Key? key,
+    required this.data,
+    this.indexNumber,
+    this.indexDelimiter = ". ",
+    this.indexStyle,
+    this.onLinkTab,
+    this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
+    this.equationStyle,
+    this.controller,
+    this.padding,
+    this.blockSpacing = 8,
+  }) : super(key: key);
 
   int getDataLength() {
     return data.blocks.length;
@@ -106,9 +108,9 @@ class DraftTextView extends StatelessWidget {
       var styleMap = block.textStyleMap(textStyle);
       var inlineSpanList = styleMap
           .map((entry) => TextSpan(
-        text: entry.key,
-        style: entry.value,
-      ))
+                text: entry.key,
+                style: entry.value,
+              ))
           .toList();
       if (index == 0 && indexNumber != null) {
         inlineSpanList.insert(
@@ -132,6 +134,7 @@ class DraftTextView extends StatelessWidget {
           style: defaultStyle,
           textAlign: block.data.textAlign,
         ),
+        equationStyle: equationStyle,
       );
     } else {
       textView = LaTexT(
@@ -152,6 +155,7 @@ class DraftTextView extends StatelessWidget {
           style: textStyle,
           textAlign: block.data.textAlign,
         ),
+        equationStyle: equationStyle,
       );
     }
 
@@ -215,7 +219,7 @@ class DraftTextView extends StatelessWidget {
         padding: EdgeInsets.only(left: size.width * block.depth),
         child: Row(
           crossAxisAlignment:
-          CrossAxisAlignment.start, // Align items at the start vertically
+              CrossAxisAlignment.start, // Align items at the start vertically
           children: [
             dot,
             Expanded(
