@@ -1,70 +1,319 @@
 import 'dart:convert';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_draft/data/draft_data.dart';
 import 'package:flutter_draft/type/block_type.dart';
 import 'package:flutter_draft/util/text_util.dart';
+import 'package:latext/latext.dart';
 
 typedef OnLinkTab = void Function(String url);
 
 class DraftTextView extends StatelessWidget {
+  final String? indexNumber;
+  final String? indexDelimiter;
+  final TextStyle? indexStyle;
   final DraftData data;
   final TextStyle defaultStyle;
   final OnLinkTab? onLinkTab;
-  final double blockSpacing = 8;
+  final double blockSpacing;
   final ScrollController? controller;
   final EdgeInsets? padding;
+  final String? chapter;
 
   DraftTextView.json(dynamic json,
       {Key? key,
-      this.onLinkTab,
-      this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
-      this.controller,
-      this.padding})
+        this.indexNumber,
+        this.indexDelimiter = ". ",
+        this.indexStyle,
+        this.onLinkTab,
+        this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
+        this.controller,
+        this.padding,
+        this.blockSpacing = 8,
+        this.chapter})
       : data = DraftData.fromJson(json),
         super(key: key);
 
   DraftTextView.jsonString(String json,
       {Key? key,
-      this.onLinkTab,
-      this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
-      this.controller,
-      this.padding})
+        this.indexNumber,
+        this.indexDelimiter = ". ",
+        this.indexStyle,
+        this.onLinkTab,
+        this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
+        this.controller,
+        this.padding,
+        this.blockSpacing = 8,
+        this.chapter})
       : data = DraftData.fromJson(jsonDecode(json)),
         super(key: key);
 
   const DraftTextView(
       {Key? key,
-      required this.data,
-      this.onLinkTab,
-      this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
-      this.controller,
-      this.padding})
+        required this.data,
+        this.indexNumber,
+        this.indexDelimiter = ". ",
+        this.indexStyle,
+        this.onLinkTab,
+        this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
+        this.controller,
+        this.padding,
+        this.blockSpacing = 8,
+        this.chapter})
       : super(key: key);
+
+  int getDataLength() {
+    return data.blocks.length;
+  }
 
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
       padding: padding,
       controller: controller,
-      itemBuilder: itemBuilder,
+      itemBuilder: _itemBuilder,
       itemCount: data.blocks.length,
       shrinkWrap: true,
+      primary: false,
     );
   }
 
-  Widget itemBuilder(BuildContext context, int index) {
+  Widget _itemBuilder(BuildContext context, int index) {
     final block = data.blocks[index];
-    return Padding(
-      padding: EdgeInsets.only(bottom: blockSpacing),
-      child: blockBuilder(context, block),
-    );
+    return Builder(builder: (context) {
+      try {
+        return Padding(
+          padding: EdgeInsets.only(bottom: blockSpacing),
+          child: _blockBuilder(context, index, block),
+        );
+      } catch (ex) {
+        return SizedBox();
+      }
+    });
   }
 
-  Widget blockBuilder(BuildContext context, Block block) {
-    Text textView;
-    var textTheme = Theme.of(context).textTheme;
+  Widget _blockBuilder(BuildContext context, int index, Block block) {
+    Widget textView;
+    TextStyle textStyle = _getTextStyle(
+      Theme.of(context).textTheme,
+      block,
+    );
+
+    // text view
+    if (block.inlineStyle.isNotEmpty) {
+      var styleMap = block.textStyleMap(textStyle);
+      var inlineSpanList = styleMap
+          .map((entry) => TextSpan(
+        text: entry.key,
+        style: entry.value,
+      ))
+          .toList();
+      if (index == 0 && indexNumber != null) {
+        inlineSpanList.insert(
+            0,
+            TextSpan(
+              text: "$indexNumber$indexDelimiter",
+              style: indexStyle ?? textStyle,
+            ));
+      }
+
+      // IMPORTANT: Here are passing only the concatenated text to KaTex,
+      // hence all the styles are ignore.
+      // TODO: add functionlity in KaTex module to receive and render
+      // list of text span.
+
+      textView = LaTexT(
+        laTeXCode: Text(
+          TextSpan(
+            children: inlineSpanList,
+          ).toPlainText(),
+          style: defaultStyle,
+          textAlign: block.data.textAlign,
+        ),
+      );
+    } else {
+      textView = LaTexT(
+        laTeXCode: Text(
+          TextSpan(
+            children: [
+              if (index == 0 && indexNumber != null)
+                TextSpan(
+                  text: "$indexNumber$indexDelimiter",
+                  style: indexStyle ?? textStyle,
+                ),
+              TextSpan(
+                text: block.text,
+                style: defaultStyle,
+              ),
+            ],
+          ).toPlainText(),
+          style: textStyle,
+          textAlign: block.data.textAlign,
+        ),
+      );
+    }
+
+    // indented text
+    if (!block.data.isEmpty && block.data.textIndent != 0) {
+      return Padding(
+        padding: EdgeInsets.only(
+          left: TextUtil.measureText(' ', textStyle).width *
+              block.data.textIndent,
+        ),
+        child: textView,
+      );
+    }
+
+    // quote
+    if (block.type == BlockType.quote) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          border: Border(
+            left: BorderSide(
+              color: Colors.grey.shade300,
+              width: 5,
+            ),
+          ),
+        ),
+        child: textView,
+      );
+    }
+
+    // code
+    if (block.type == BlockType.code) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        color: Colors.grey.shade100,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: textView,
+        ),
+      );
+    }
+
+    // unordered list
+    if (block.type == BlockType.bulletList) {
+      var size = TextUtil.measureText(' ', textStyle);
+      double dotSize = 5;
+      const solid = BoxDecoration(color: Colors.black, shape: BoxShape.circle);
+      var hollow = BoxDecoration(
+          shape: BoxShape.circle, border: Border.all(color: Colors.black));
+      Widget dot = Container(
+        width: dotSize,
+        height: dotSize,
+        margin: EdgeInsets.only(
+            right: dotSize,
+            top: textStyle.fontSize! *
+                0.2), // Adjust top margin for vertical alignment
+        decoration: block.depth > 0 ? hollow : solid,
+      );
+      return Padding(
+        padding: EdgeInsets.only(left: size.width * block.depth),
+        child: Row(
+          crossAxisAlignment:
+          CrossAxisAlignment.start, // Align items at the start vertically
+          children: [
+            dot,
+            Expanded(
+              // Use Expanded to allow text to wrap
+              child: textView,
+            ),
+          ],
+        ),
+      );
+    }
+
+    // ordered list
+    if (block.type == BlockType.numberList) {
+      var size = TextUtil.measureText(' ', textStyle);
+      Text numberView = Text('${block.data.number}.', style: textStyle);
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          SizedBox.fromSize(
+            size: Size(size.width * block.depth + size.width / 2, size.height),
+            child: Align(alignment: Alignment.centerRight, child: numberView),
+          ),
+          textView,
+        ],
+      );
+    }
+
+    // entityRanges
+    if (block.entityRanges.isNotEmpty) {
+      List<Widget> children = [];
+      String text = block.text;
+      var entityMap = data.entityMap;
+      for (var range in block.entityRanges) {
+        var entity = entityMap["${range.key}"];
+        if (entity == null) continue;
+        switch (entity.type) {
+          case EntityType.image:
+            CachedNetworkImage image = CachedNetworkImage(
+              imageUrl: entity.data.url ?? entity.data.src!,
+              placeholder: (context, url) => const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.all(12.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                ],
+              ),
+              errorWidget: (context, url, error) => const Icon(Icons.error),
+              height: 120,
+              fit: BoxFit.scaleDown,
+              memCacheHeight: 300,
+              memCacheWidth: 300,
+            );
+            children.add(image);
+            if (entity.data.name?.isNotEmpty ?? false) {
+              children.add(Text(entity.data.name!,
+                  style: textStyle, textAlign: TextAlign.center));
+            }
+            break;
+          case EntityType.divider:
+            Divider divider = const Divider();
+            children.add(divider);
+            break;
+          case EntityType.link:
+            textView = Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: text.substring(0, range.offset)),
+                  TextSpan(
+                    text: text.substring(
+                        range.offset, range.offset + range.length),
+                    style: textStyle.copyWith(
+                        color: Colors.blue,
+                        decoration: TextDecoration.underline),
+                    recognizer: TapGestureRecognizer()
+                      ..onTap = () => onLinkTab?.call(entity.data.url ?? ""),
+                  ),
+                  TextSpan(text: text.substring(range.offset + range.length)),
+                ],
+              ),
+              textAlign: block.data.textAlign,
+            );
+            children.add(textView);
+            break;
+        }
+      }
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      );
+    }
+
+    return textView;
+  }
+
+  TextStyle _getTextStyle(TextTheme textTheme, Block block) {
     TextStyle textStyle;
     switch (block.type) {
       case BlockType.h1:
@@ -86,7 +335,10 @@ class DraftTextView extends StatelessWidget {
         textStyle = textTheme.titleLarge ?? defaultStyle;
         break;
       case BlockType.code:
-        textStyle = defaultStyle.copyWith(fontWeight: FontWeight.w500, color: Colors.grey.shade700);
+        textStyle = defaultStyle.copyWith(
+          fontWeight: FontWeight.w500,
+          color: Colors.grey.shade700,
+        );
         break;
       case BlockType.quote:
         textStyle = TextStyle(
@@ -100,125 +352,6 @@ class DraftTextView extends StatelessWidget {
         textStyle = textTheme.bodyMedium ?? defaultStyle;
         break;
     }
-    if (block.inlineStyle.isNotEmpty) {
-      var styleMap = block.textStyleMap(textStyle);
-      textView = Text.rich(
-          TextSpan(children: styleMap.map((entry) => TextSpan(text: entry.key, style: entry.value)).toList()),
-          textAlign: block.data.textAlign);
-    } else {
-      textView = Text(block.text, style: textStyle, textAlign: block.data.textAlign);
-    }
-    if (!block.data.isEmpty && block.data.textIndent != 0) {
-      return Padding(
-        padding: EdgeInsets.only(left: TextUtil.measureText('缩进', textStyle).width * block.data.textIndent),
-        child: textView,
-      );
-    }
-    // 引用块
-    if (block.type == BlockType.quote) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-            color: Colors.grey.shade100, border: Border(left: BorderSide(color: Colors.grey.shade300, width: 5))),
-        child: textView,
-      );
-    }
-    if (block.type == BlockType.code) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        color: Colors.grey.shade100,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: textView,
-        ),
-      );
-    }
-    // 无序列表
-    if (block.type == BlockType.bulletList) {
-      var size = TextUtil.measureText('缩进', textStyle);
-      double dotSize = 5;
-      const solid = BoxDecoration(color: Colors.black, shape: BoxShape.circle);
-      var hollow = BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.black));
-      Widget dot = Container(
-        width: dotSize,
-        height: dotSize,
-        margin: EdgeInsets.only(right: dotSize),
-        decoration: block.depth > 0 ? hollow : solid,
-      );
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          SizedBox.fromSize(
-            size: Size(size.width * block.depth + dotSize * 2, size.height),
-            child: Align(alignment: Alignment.centerRight, child: dot),
-          ),
-          textView,
-        ],
-      );
-    }
-    if (block.type == BlockType.numberList) {
-      var size = TextUtil.measureText('缩进', textStyle);
-      Text numberView = Text('${block.data.number}.', style: textStyle);
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          SizedBox.fromSize(
-            size: Size(size.width * block.depth + size.width / 2, size.height),
-            child: Align(alignment: Alignment.centerRight, child: numberView),
-          ),
-          Expanded(child: textView),
-        ],
-      );
-    }
-    if (block.entityRanges.isNotEmpty) {
-      List<Widget> children = [];
-      String text = block.text;
-      var entityMap = data.entityMap;
-      for (var range in block.entityRanges) {
-        var entity = entityMap["${range.key}"];
-        if (entity == null) continue;
-        switch (entity.type) {
-          case EntityType.image:
-            Image image = Image.network(
-              entity.data.url!,
-              width: MediaQuery.of(context).size.width,
-              fit: BoxFit.scaleDown,
-            );
-            children.add(image);
-            if (entity.data.name?.isNotEmpty ?? false) {
-              children.add(Text(entity.data.name!, style: textStyle, textAlign: TextAlign.center));
-            }
-            break;
-          case EntityType.divider:
-            Divider divider = const Divider();
-            children.add(divider);
-            break;
-          case EntityType.link:
-            textView = Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(text: text.substring(0, range.offset)),
-                  TextSpan(
-                    text: text.substring(range.offset, range.offset + range.length),
-                    style: textStyle.copyWith(color: Colors.blue, decoration: TextDecoration.underline),
-                    recognizer: TapGestureRecognizer()..onTap = () => onLinkTab?.call(entity.data.url ?? ""),
-                  ),
-                  TextSpan(text: text.substring(range.offset + range.length)),
-                ],
-              ),
-              textAlign: block.data.textAlign,
-            );
-            children.add(textView);
-            break;
-        }
-      }
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
-      );
-    }
-    return textView;
+    return textStyle;
   }
 }

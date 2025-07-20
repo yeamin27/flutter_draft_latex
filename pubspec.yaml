@@ -11,6 +11,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  latext: ^0.4.1
+  cached_network_image: ^3.2.0
+
+dependency_overrides:
+  flutter_math_fork:
+    git:
+      url: "https://github.com/yeaminChy/flutter_math_fork.git"
+      ref: vE0.7.5
 
 dev_dependencies:
   flutter_test:
