@@ -20,7 +20,8 @@ class DraftTextView extends StatelessWidget {
       {Key? key,
       this.onLinkTab,
       this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
-      this.controller, this.padding})
+      this.controller,
+      this.padding})
       : data = DraftData.fromJson(json),
         super(key: key);
 
@@ -28,7 +29,8 @@ class DraftTextView extends StatelessWidget {
       {Key? key,
       this.onLinkTab,
       this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
-      this.controller, this.padding})
+      this.controller,
+      this.padding})
       : data = DraftData.fromJson(jsonDecode(json)),
         super(key: key);
 
@@ -37,7 +39,8 @@ class DraftTextView extends StatelessWidget {
       required this.data,
       this.onLinkTab,
       this.defaultStyle = const TextStyle(fontSize: 12, color: Colors.black),
-      this.controller, this.padding})
+      this.controller,
+      this.padding})
       : super(key: key);
 
   @override
@@ -157,13 +160,14 @@ class DraftTextView extends StatelessWidget {
       var size = TextUtil.measureText('缩进', textStyle);
       Text numberView = Text('${block.data.number}.', style: textStyle);
       return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
           SizedBox.fromSize(
             size: Size(size.width * block.depth + size.width / 2, size.height),
             child: Align(alignment: Alignment.centerRight, child: numberView),
           ),
-          textView,
+          Expanded(child: textView),
         ],
       );
     }
